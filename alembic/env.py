@@ -8,7 +8,12 @@ from alembic import context
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from app.models.models import Base
+from app.models.base import Base
+from app.models.event import Event
+from app.models.venue import Venue
+from app.models.session import Session
+from app.models.favorite import Favorite
+from app.models.user import User
 
 
 # this is the Alembic Config object, which provides
@@ -24,7 +29,12 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-from app.models.models import Base
+from app.models.base import Base
+from app.models.event import Event
+from app.models.venue import Venue
+from app.models.session import Session
+from app.models.favorite import Favorite
+from app.models.user import User
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

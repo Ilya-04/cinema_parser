@@ -7,6 +7,9 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import time
 import datetime
 import re
+from app.services.save_utils import save_event_and_session
+from app.db import get_db
+from sqlalchemy.orm import Session as SQLAlchemySession
 
 MONTHS_RU = {
     "января": "01",
@@ -25,7 +28,7 @@ MONTHS_RU = {
 
 def parse_events():
     options = webdriver.ChromeOptions()
-    # options.add_argument("--headless")  # УБРАТЬ КОММЕНТАРИЙ, ЕСЛИ ХОЧЕШЬ СКРЫТЫЙ РЕЖИМ
+    # options.add_argument("--headless")
     driver = webdriver.Chrome(options=options)
     wait = WebDriverWait(driver, 10)
 
@@ -37,101 +40,81 @@ def parse_events():
             show_more_button = wait.until(EC.element_to_be_clickable(
                 (By.XPATH, '//button[.//span[text()[contains(., "Показать ещё")]]]')))
             driver.execute_script("arguments[0].scrollIntoView(true);", show_more_button)
-            time.sleep(1)  # ДАЁМ ВРЕМЯ НА ПРОКРУТКУ
+            time.sleep(1)
             show_more_button.click()
             time.sleep(2)
         except TimeoutException:
             break
 
-    # ИЩЕМ ВСЕ ССЫЛКИ НА КАРТОЧКИ
     links_elements = driver.find_elements(By.CSS_SELECTOR, "a.DetailedCardWrapper_eventItem__ZS8dA")
     event_links = [link.get_attribute("href") for link in links_elements]
+    event_links = [link if link.startswith("http") else f"https://ticketon.kz{link}" for link in event_links]
 
-    # ЕСЛИ ССЫЛКА ОТНОСИТЕЛЬНАЯ — ДОБАВЛЯЕМ ДОМЕН
-    event_links = [
-        link if link.startswith("http") else f"https://ticketon.kz{link}"
-        for link in event_links
-    ]
+    # ПОЛУЧАЕМ СЕССИЮ БАЗЫ ДАННЫХ
+    db: SQLAlchemySession = next(get_db())
 
-    # ПРОХОДИМСЯ ПО ВСЕМ ССЫЛКАМ
     for link in event_links:
         print(f"Открываем: {link}")
         driver.get(link)
         time.sleep(2)
 
         try:
-            # НАЗВАНИЕ СОБЫТИЯ
             try:
                 title = driver.find_element(By.XPATH, '//div[contains(@class, "_ontentDetails_title")]/h1').text
             except NoSuchElementException:
                 title = ""
-            
-            # Если название пустое, пропускаем эту страницу
             if not title:
                 continue
-            
-            # ЖАНР
+
             try:
                 genre = driver.find_element(By.XPATH, '//li[h5[text()="Жанр"]]//span').text
             except NoSuchElementException:
                 genre = ""
-            
-            # ВОЗРАСТНОЕ ОГРАНИЧЕНИЕ
+
             try:
                 age_rating = driver.find_element(By.XPATH, '//li[h5[text()="Возрастное ограничение"]]//span').text
             except NoSuchElementException:
                 age_rating = ""
-            
-            # ПРОДОЛЖИТЕЛЬНОСТЬ
+
             try:
                 duration = driver.find_element(By.XPATH, '//li[h5[text()="Продолжительность"]]//span').text
             except NoSuchElementException:
                 duration = ""
-            
-            # ОПИСАНИЕ
+
             try:
                 description = driver.find_element(By.XPATH, '//div[h5[text()="Описание"]]//div[@class="Description_descriptionText__574Xi"]//p').text
             except NoSuchElementException:
                 description = ""
-            
-            # МЕСТО ПРОВЕДЕНИЯ
+
             try:
                 venue_address = driver.find_element(By.XPATH, '//li[h5[text()="Место проведения"]]//span').text
             except NoSuchElementException:
                 venue_address = ""
-            
-            # Если место проведения пустое, пропускаем эту страницу
+
             if not venue_address:
                 continue
-            
-            url = link  # предполагаем, что картинка будет по той же ссылке
 
-            # XPATH ДЛЯ ПОЛУЧЕНИЯ ССЫЛКИ НА ПОСТЕР
+            url = link
+            type_event = 'Спектакль'
             poster_url = driver.find_element(By.XPATH, '//div[contains(@class, "_ontentDetails_poster")]/descendant::img').get_attribute("src")
 
-            # ПАРСИНГ СЕАНСОВ
             session_elements = driver.find_elements(By.XPATH, '//li[contains(@class, "EventRow_scheduleItem__Ww9vv")]')
-            sessions = []
 
             for session in session_elements:
                 try:
-                    # День
                     day = session.find_element(
                         By.XPATH,
                         './/div[contains(@class, "Date_dateWrapper__Bbx2I")]//div[contains(@class, "Date_day__")]'
                     ).text
 
-                    # Месяц
                     month_text = session.find_element(
                         By.XPATH,
                         './/div[contains(@class, "Date_dateWrapper__Bbx2I")]//div[contains(@class, "Date_dateText__")]//div[1]'
                     ).text.lower()
 
-                    # Преобразуем в YYYY-MM-DD
                     month_number = MONTHS_RU.get(month_text, "01")
                     year = datetime.datetime.now().year
                     date = f"{year}-{month_number}-{int(day):02d}"
-
                 except NoSuchElementException:
                     date = ""
 
@@ -154,11 +137,22 @@ def parse_events():
                     price = ""
 
                 if date or time_ or price:
-                    sessions.append({
-                        'date': date,
-                        'time': time_,
-                        'price': price
-                    })
+                    # СОХРАНЯЕМ В БАЗУ ДАННЫХ
+                    save_event_and_session(
+                        db=db,
+                        title=title,
+                        genre=genre,
+                        age_rating=age_rating,
+                        duration=duration,
+                        description=description,
+                        url=url,
+                        type_event=type_event,
+                        poster_url=poster_url,
+                        date=date,
+                        venue_address=venue_address,
+                        time_=time_,
+                        price=price
+                    )
 
             print("СОБЫТИЕ:", title)
             print("ЖАНР:", genre)
@@ -166,7 +160,6 @@ def parse_events():
             print("ПРОДОЛЖИТЕЛЬНОСТЬ:", duration)
             print("ОПИСАНИЕ:", description)
             print("МЕСТО ПРОВЕДЕНИЯ:", venue_address)
-            print("СЕАНСЫ:", sessions)
             print("URL:", poster_url)
             print("===")
 

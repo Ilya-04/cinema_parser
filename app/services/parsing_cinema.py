@@ -7,6 +7,13 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import time
 import datetime
 import re
+from app.db import get_db
+from app.services.save_utils import save_event_and_session
+from sqlalchemy.orm import Session as SQLAlchemySession
+
+def parse_events():
+    # Извлекаем сессию из генератора
+    db: SQLAlchemySession = next(get_db())  # Получаем сессию из генератора
 
 MONTHS_RU = {
     "января": "01",
@@ -24,8 +31,9 @@ MONTHS_RU = {
 }
 
 def parse_events():
+    # Настройки и запуск Selenium
     options = webdriver.ChromeOptions()
-    # options.add_argument("--headless")  # УБРАТЬ КОММЕНТАРИЙ, ЕСЛИ ХОЧЕШЬ СКРЫТЫЙ РЕЖИМ
+    # options.add_argument("--headless")
     driver = webdriver.Chrome(options=options)
     wait = WebDriverWait(driver, 10)
 
@@ -53,48 +61,55 @@ def parse_events():
         for link in event_links
     ]
 
+    # Извлекаем сессию из генератора
+    db = next(get_db())  # Получаем сессию из генератора
+
     # ПРОХОДИМСЯ ПО ВСЕМ ССЫЛКАМ
+    
     for link in event_links:
         print(f"Открываем: {link}")
         driver.get(link)
         time.sleep(2)
 
         try:
-            # НАЗВАНИЕ СОБЫТИЯ
             try:
                 title = driver.find_element(By.XPATH, '//div[contains(@class, "_ontentDetails_title")]/h1').text
             except NoSuchElementException:
-                title = ""     
-            
-            # ЖАНР
+                title = ""
+            if not title:
+                continue
+
             try:
                 genre = driver.find_element(By.XPATH, '//li[h5[text()="Жанр"]]//span').text
             except NoSuchElementException:
                 genre = ""
-            
-            # ВОЗРАСТНОЕ ОГРАНИЧЕНИЕ
+
             try:
                 age_rating = driver.find_element(By.XPATH, '//li[h5[text()="Возрастное ограничение"]]//span').text
             except NoSuchElementException:
                 age_rating = ""
-            
-            # ПРОДОЛЖИТЕЛЬНОСТЬ
+
             try:
                 duration = driver.find_element(By.XPATH, '//li[h5[text()="Продолжительность"]]//span').text
             except NoSuchElementException:
                 duration = ""
-            
-            # ОПИСАНИЕ
+
             try:
                 description = driver.find_element(By.XPATH, '//div[h5[text()="Описание"]]//div[@class="Description_descriptionText__574Xi"]//p').text
             except NoSuchElementException:
                 description = ""
-                        
-            url = link  # предполагаем, что картинка будет по той же ссылке
 
-            # XPATH ДЛЯ ПОЛУЧЕНИЯ ССЫЛКИ НА ПОСТЕР
+            try:
+                venue_address = driver.find_element(By.XPATH, '//li[h5[text()="Место проведения"]]//span').text
+            except NoSuchElementException:
+                venue_address = ""
+
+            if not venue_address:
+                continue
+
+            url = link
+            type_event = 'Кино'
             poster_url = driver.find_element(By.XPATH, '//div[contains(@class, "_ontentDetails_poster")]/descendant::img').get_attribute("src")
-
 
             # ПАРСИНГ СЕАНСОВ
             session_rows = driver.find_elements(By.XPATH, '//div[contains(@class, "ScheduleRow_scheduleRow__o3xf2")]')
@@ -136,21 +151,17 @@ def parse_events():
                         price = ""
 
                     if date or time_ or price:
-                        sessions.append({
-                            'date': date,
-                            'time': time_,
-                            'price': price,
-                        })
+                        # Сохраняем каждый сеанс в базе данных
+                        save_event_and_session(db, title, genre, age_rating, duration, description, url, type_event, poster_url, date, venue_address, time_, price)
 
-
-            print("СОБЫТИЕ:", title)
-            print("ЖАНР:", genre)
-            print("ВОЗРАСТНОЕ ОГРАНИЧЕНИЕ:", age_rating)
-            print("ПРОДОЛЖИТЕЛЬНОСТЬ:", duration)
-            print("ОПИСАНИЕ:", description)
-            print("МЕСТО ПРОВЕДЕНИЯ:", venue_address)
-            print("СЕАНСЫ:", sessions)
-            print("URL:", poster_url)
+            print(f"СОБЫТИЕ: {title}")
+            print(f"ЖАНР: {genre}")
+            print(f"ВОЗРАСТНОЕ ОГРАНИЧЕНИЕ: {age_rating}")
+            print(f"ПРОДОЛЖИТЕЛЬНОСТЬ: {duration}")
+            print(f"ОПИСАНИЕ: {description}")
+            print(f"МЕСТО ПРОВЕДЕНИЯ: {venue_address}")
+            print(f"СЕАНСЫ: {sessions}")
+            print(f"URL: {poster_url}")
             print("===")
 
         except Exception as e:
