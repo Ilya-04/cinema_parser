@@ -11,10 +11,6 @@ from app.db import get_db
 from app.services.save_utils import save_event_and_session
 from sqlalchemy.orm import Session as SQLAlchemySession
 
-def parse_events():
-    # Извлекаем сессию из генератора
-    db: SQLAlchemySession = next(get_db())  # Получаем сессию из генератора
-
 MONTHS_RU = {
     "января": "01",
     "февраля": "02",
@@ -65,7 +61,6 @@ def parse_events():
     db = next(get_db())  # Получаем сессию из генератора
 
     # ПРОХОДИМСЯ ПО ВСЕМ ССЫЛКАМ
-    
     for link in event_links:
         print(f"Открываем: {link}")
         driver.get(link)
@@ -74,38 +69,41 @@ def parse_events():
         try:
             try:
                 title = driver.find_element(By.XPATH, '//div[contains(@class, "_ontentDetails_title")]/h1').text
+                print(f"Найдено название: {title}")
             except NoSuchElementException:
                 title = ""
+                print("Название не найдено")
+            
             if not title:
-                continue
+                continue  # Пропускаем событие, если нет названия
 
             try:
                 genre = driver.find_element(By.XPATH, '//li[h5[text()="Жанр"]]//span').text
+                print(f"Найден жанр: {genre}")
             except NoSuchElementException:
                 genre = ""
+                print("Жанр не найден")
 
             try:
                 age_rating = driver.find_element(By.XPATH, '//li[h5[text()="Возрастное ограничение"]]//span').text
+                print(f"Найдено возрастное ограничение: {age_rating}")
             except NoSuchElementException:
                 age_rating = ""
+                print("Возрастное ограничение не найдено")
 
             try:
                 duration = driver.find_element(By.XPATH, '//li[h5[text()="Продолжительность"]]//span').text
+                print(f"Найдена продолжительность: {duration}")
             except NoSuchElementException:
                 duration = ""
+                print("Продолжительность не найдена")
 
             try:
                 description = driver.find_element(By.XPATH, '//div[h5[text()="Описание"]]//div[@class="Description_descriptionText__574Xi"]//p').text
+                print(f"Найдено описание: {description}")
             except NoSuchElementException:
                 description = ""
-
-            try:
-                venue_address = driver.find_element(By.XPATH, '//li[h5[text()="Место проведения"]]//span').text
-            except NoSuchElementException:
-                venue_address = ""
-
-            if not venue_address:
-                continue
+                print("Описание не найдено")
 
             url = link
             type_event = 'Кино'
@@ -123,14 +121,18 @@ def parse_events():
                     month_number = MONTHS_RU.get(month_text, "01")
                     year = datetime.datetime.now().year
                     date = f"{year}-{month_number}-{int(day):02d}"
+                    print(f"Найдена дата: {date}")
                 except NoSuchElementException:
                     date = ""
+                    print("Дата не найдена")
 
                 try:
                     # Адрес
                     venue_address = row.find_element(By.XPATH, './/div[contains(@class, "CinemaInfo_address__")]').text
+                    print(f"Найден адрес сеанса: {venue_address}")
                 except NoSuchElementException:
                     venue_address = ""
+                    print("Адрес сеанса не найден")
 
                 # Список билетов с временем и ценой
                 ticket_wrappers = row.find_elements(By.XPATH, './/div[contains(@class, "TicketsList_ticketWrapper__")]')
@@ -138,8 +140,10 @@ def parse_events():
                 for wrapper in ticket_wrappers:
                     try:
                         time_ = wrapper.find_element(By.XPATH, './/span[contains(@class, "TicketButton_text__")]').text
+                        print(f"Найдено время сеанса: {time_}")
                     except NoSuchElementException:
                         time_ = ""
+                        print("Время сеанса не найдено")
 
                     try:
                         # Ищем ВСЕ div с классом TicketsList_info__, берём второй
@@ -147,8 +151,10 @@ def parse_events():
                         price = price_elements[1].text if len(price_elements) > 1 else ""
                         if price:
                             price = re.sub(r'[^\d]', '', price)
+                            print(f"Найдена цена: {price}")
                     except NoSuchElementException:
                         price = ""
+                        print("Цена не найдена")
 
                     if date or time_ or price:
                         # Сохраняем каждый сеанс в базе данных
@@ -171,3 +177,20 @@ def parse_events():
         time.sleep(2)
 
     driver.quit()
+
+
+"""
+from app.services import parsing_cinema, parsing_concerts, parsing_theatres
+
+if __name__ == "__main__":
+    print("🔽 Парсинг кино...")
+    parsing_cinema.parse_events()
+
+    print("🔽 Парсинг концертов...")
+    parsing_concerts.parse_events()
+
+    print("🔽 Парсинг театров...")
+    parsing_theatres.parse_events()
+
+    print("✅ Парсинг завершён.")
+"""
