@@ -15,3 +15,4 @@ class Event(Base):
     poster_url = Column(String)
     url = Column(String)
     favorites = relationship("Favorite", back_populates="movie")
+    sessions = relationship("Session", back_populates="event")

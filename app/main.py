@@ -1,13 +1,8 @@
-from app.services import parsing_cinema, parsing_concerts, parsing_theatres
+# app/main.py
+from fastapi import FastAPI
+from app.api import route_events, route_sessions
 
-if __name__ == "__main__":
-    print("🔽 Парсинг кино...")
-    parsing_cinema.parse_events()
+app = FastAPI()
 
-    print("🔽 Парсинг концертов...")
-    parsing_concerts.parse_events()
-
-    print("🔽 Парсинг театров...")
-    parsing_theatres.parse_events()
-
-    print("✅ Парсинг завершён.")
+app.include_router(route_events.router)
+app.include_router(route_sessions.router)

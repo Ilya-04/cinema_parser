@@ -2,12 +2,14 @@ from pydantic import BaseModel
 
 class EventBase(BaseModel):
     title: str
-    type: str
+    type_event: str
     genre: str
     age_rating: str
-    duration: int
+    duration: str
     description: str
     poster_url: str
+    url: str
+    
 
 class EventCreate(EventBase):
     pass
@@ -15,5 +17,6 @@ class EventCreate(EventBase):
 class EventOut(EventBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = {
+    "from_attributes": True
+}

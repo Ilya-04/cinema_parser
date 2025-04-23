@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey
 from app.models.base import Base
+from sqlalchemy.orm import relationship
 
 class Session(Base):
     __tablename__ = "sessions"
@@ -10,3 +11,4 @@ class Session(Base):
     date = Column(String)
     time = Column(String)
     price = Column(String)
+    event = relationship("Event", back_populates="sessions")
