@@ -31,7 +31,7 @@ function EventCard({ event }) {
         margin: '1rem 0',
         display: 'flex',
         flexDirection: 'column',
-        width: '1000px',  // Фиксированная ширина карточки
+        width: '1100px',  // Фиксированная ширина карточки
         boxSizing: 'border-box', // Учитываем padding и border в расчете ширины
       }}
     >
@@ -42,7 +42,7 @@ function EventCard({ event }) {
           src={event.poster_url}
           alt={event.title}
           style={{
-            width: '200px',     // фиксированная ширина постера
+            width: '250px',     // фиксированная ширина постера
             height: 'auto',     // сохраняем пропорции
             marginRight: '1rem',
             borderRadius: '4px',

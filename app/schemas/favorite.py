@@ -1,16 +1,8 @@
 from pydantic import BaseModel
-from datetime import datetime
 
-class FavoriteBase(BaseModel):
-    user_id: int
-    movie_id: int
-
-class FavoriteCreate(FavoriteBase):
-    pass
-
-class FavoriteOut(FavoriteBase):
+class FavoriteOut(BaseModel):
     id: int
-    added_at: datetime
+    event_id: int
 
     model_config = {
     "from_attributes": True
